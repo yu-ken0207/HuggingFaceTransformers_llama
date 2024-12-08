@@ -1,4 +1,4 @@
-# README: 基於 FastAPI 和 LLaMA 模型的 API 服務
+# 基於 FastAPI 和 LLaMA 模型的 API 服務
 
 此專案展示如何構建基於 FastAPI 的 API 服務，並整合 Meta LLaMA 3.1 模型進行文本生成任務。服務包括：
 
