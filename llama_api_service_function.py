@@ -18,8 +18,8 @@ model_id = "/home/ailab/workspace/kxkken/Meta-Llama-3.1-8B-Instruct"
 tokenizer = transformers.AutoTokenizer.from_pretrained(model_id)
 model = transformers.AutoModelForCausalLM.from_pretrained(
     model_id,
-    torch_dtype=torch.float16, # float32
-    load_in_8bit=True,  # 啟用 8-bit 量化 可以註解 將模型權重從浮點數壓縮到 8-bit  8-bit 量化只影響模型的權重存儲，而激活值仍然使用 FP16 或 FP32 進行計算
+    torch_dtype=torch.float32, # float32
+    load_in_8bit=False,  # 啟用 8-bit 量化 可以註解 將模型權重從浮點數壓縮到 8-bit  8-bit 量化只影響模型的權重存儲，而激活值仍然使用 FP16 或 FP32 進行計算
     device_map="balanced"
 )
 """
@@ -139,6 +139,7 @@ class GenerateWithFunctionRequest(BaseModel):
 class GenerateWithFunctionResponse(BaseModel):
     role: str
     content: str
+    tool_call:bool
 
 # 定義 POST 路由
 @app.post(
@@ -159,7 +160,6 @@ class GenerateWithFunctionResponse(BaseModel):
                                     "  \"tasks\": [\n"
                                     "    {\n"
                                     "      \"task\": \"<task>\",\n"
-                                    "      \"description\": \"<description>\"\n"
                                     "    },\n"
                                     "    ...\n"
                                     "  ]\n"
@@ -185,12 +185,8 @@ class GenerateWithFunctionResponse(BaseModel):
                                                         "type": "string",
                                                         "description": "The name of the subtask."
                                                     },
-                                                    "description": {
-                                                        "type": "string",
-                                                        "description": "Description of the subtask."
-                                                    }
                                                 },
-                                                "required": ["task", "description"]
+                                                "required": ["task"]
                                             }
                                         }
                                     },
@@ -205,7 +201,7 @@ class GenerateWithFunctionResponse(BaseModel):
         }
     }
 )
-async def decompose_task(request: GenerateWithFunctionRequest):
+async def generate_text_func(request: GenerateWithFunctionRequest):
     messages = request.messages
     tools = request.tools
     max_new_tokens = request.max_new_tokens
@@ -233,38 +229,158 @@ async def decompose_task(request: GenerateWithFunctionRequest):
     )
 
     # 提取生成文本
-    generated_text = tokenizer.decode(outputs[0][len(inputs["input_ids"][0]):]).strip()
+    generated_text = tokenizer.decode(outputs[0][len(inputs["input_ids"][0]):])
 
-    # 嘗試解析工具調用
-    tool_used = False
-    tool_call = None
-    try:
-        if "<tool_call>" in generated_text and "</tool_call>" in generated_text:
-            tool_call_start = generated_text.find("<tool_call>") + len("<tool_call>")
-            tool_call_end = generated_text.find("</tool_call>")
-            tool_call_json = generated_text[tool_call_start:tool_call_end].strip()
-            tool_call = json.loads(tool_call_json)
-
-            if "name" in tool_call:
-                tool_used = True
-    except Exception as e:
-        # 捕獲解析錯誤
-        tool_call = None
-
-    # 如果檢測到工具調用，執行工具函數
-    if tool_used:
-        tool_name = tool_call.get("name")
-        tool_args = tool_call.get("arguments", {})
-        if tool_name == "decompose_task":
-            result = [{"task": t["task"], "description": t["description"]} for t in tool_args.get("tasks", [])]
-            return GenerateWithFunctionResponse(
-                role="assistant",
-                content=json.dumps({"tasks": result})
-            )
+    if "<|python_tag|>" in generated_text:
+        return GenerateWithFunctionResponse(
+            role="assistant",
+            content=generated_text,
+            tool_call= True
+        )
 
     # 無工具調用，返回原始生成結果
     return GenerateWithFunctionResponse(
         role="assistant",
-        content=generated_text
+        content=generated_text,
+        tool_call= False
     )
 #------------------------------------------------------------------------------------------------------------
+
+def add_numbers(a: float, b: float) -> float:
+    """
+    Add two numbers together.
+
+    Args:
+        a: The first number.
+        b: The second number.
+    
+    Returns:
+        The sum of the two numbers.
+    """
+    return a + b
+@app.post(
+    "/generate_with_function_test",
+    response_model=GenerateWithFunctionResponse,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "messages": [
+                            {"role": "system", "content": "You are a helpful assistant."},
+                            {"role": "user", "content": "What is 3 + 5?"}
+                        ],
+                        "tools": [
+                            {
+                                "name": "add_numbers",
+                                "description": "Add two numbers together.",
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {
+                                        "a": {"type": "number", "description": "The first number."},
+                                        "b": {"type": "number", "description": "The second number."}
+                                    },
+                                    "required": ["a", "b"]
+                                }
+                            }
+                        ],
+                        "max_new_tokens": 128
+                    }
+                }
+            }
+        }
+    }
+)
+async def generate_text_func_test(request: GenerateWithFunctionRequest):
+    messages = request.messages
+    tools = request.tools
+    max_new_tokens = request.max_new_tokens
+
+    # 構建聊天範本
+    formatted_chat = tokenizer.apply_chat_template(
+        conversation=messages,
+        tools=[tool.dict() for tool in tools],  # 傳遞工具定義
+        add_generation_prompt=True,
+        return_dict=True,
+        return_tensors="pt"
+    )
+    formatted_chat = {k: v.to(model.device) for k, v in formatted_chat.items()}
+
+    # 使用模型生成
+    outputs = model.generate(
+        **formatted_chat,
+        max_new_tokens=max_new_tokens,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.1,
+    )
+    generated_text = tokenizer.decode(outputs[0][len(formatted_chat["input_ids"][0]):]).strip()
+
+    # 判斷是否包含工具調用
+    if "<|python_tag|>" in generated_text:
+        try:
+            start_index = generated_text.index("<|python_tag|>") + len("<|python_tag|>")
+            end_index = generated_text.index("<|eom_id|>")
+            tool_call_json = generated_text[start_index:end_index].strip()
+            tool_call = json.loads(tool_call_json)  # 將工具調用的 JSON 字串解析為字典
+
+            tool_name = tool_call["name"]
+            tool_args = tool_call["parameters"]
+
+            # 查找並執行對應工具
+            tool_result = None
+            for tool in tools:
+                if tool.name == tool_name:
+                    func = globals().get(tool_name)
+                    if callable(func):
+                        tool_result = func(**tool_args)
+                    else:
+                        raise ValueError(f"Tool function {tool_name} not found.")
+                    break
+
+            # 將工具結果加入對話
+            messages.append({
+                "role": "tool",
+                "name": tool_name,
+                "content": str(tool_result)
+            })
+
+            # 重新生成回應
+            formatted_chat = tokenizer.apply_chat_template(
+                conversation=messages,
+                add_generation_prompt=True,
+                return_dict=True,
+                return_tensors="pt"
+            )
+            formatted_chat = {k: v.to(model.device) for k, v in formatted_chat.items()}
+
+            outputs = model.generate(
+                **formatted_chat,
+                max_new_tokens=max_new_tokens,
+                temperature=0.7,
+                top_p=0.9,
+                repetition_penalty=1.1,
+            )
+            generated_text = tokenizer.decode(outputs[0][len(formatted_chat["input_ids"][0]):]).strip()
+
+        except Exception as e:
+            return GenerateWithFunctionResponse(
+                role="assistant",
+                content=f"Error during tool execution: {str(e)}",
+                tool_call=True
+            )
+
+        return GenerateWithFunctionResponse(
+            role="assistant",
+            content=generated_text,
+            tool_call=True
+        )
+
+
+    # 無工具調用，返回生成結果
+    return GenerateWithFunctionResponse(
+        role="assistant",
+        content=generated_text,
+        tool_call=False
+    )
+
