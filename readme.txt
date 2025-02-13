@@ -11,6 +11,9 @@
     啟動命令示例：
     uvicorn script_name:app --host 0.0.0.0 --port 8000
 
+    測試網站：
+    http://140.117.73.146:8000/docs
+
     說明：
     --host 0.0.0.0：允許從所有網絡接口訪問 API。
     --port 8000：API 將運行在 8000 端口。
