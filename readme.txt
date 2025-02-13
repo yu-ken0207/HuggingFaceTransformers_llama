@@ -11,7 +11,7 @@
     啟動命令示例：
     uvicorn script_name:app --host 0.0.0.0 --port 8000
 
-    uvicorn llama_api_service_finetune:app --host 0.0.0.0 --port 8001
+    uvicorn llama_api_service_finetune:app --host 0.0.0.0 --port 8000
     uvicorn llama_api_service_function:app --host 0.0.0.0 --port 8000
 
     測試網站：
