@@ -1,5 +1,7 @@
 # 基於 FastAPI 和 LLaMA 模型的 API 服務
 
+**Built with Llama**：兩個 `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重由 Meta Llama 3.1 微調而來，授權見最下方。
+
 此專案展示如何構建基於 FastAPI 的 API 服務，並整合 Meta LLaMA 3.1 模型進行文本生成任務。服務包括：
 
 - 簡單的文本生成端點（`/generate`）。
@@ -183,4 +185,7 @@ uvicorn llama_api_service:app --host 0.0.0.0 --port 8000
 
 ## License
 
-程式碼採 Apache-2.0，見 [LICENSE](LICENSE)。
+- 程式碼：Apache-2.0，見 [LICENSE](LICENSE)。
+- `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重與 tokenizer：由 Meta Llama 3.1 衍生，依 [Llama 3.1 Community License](LICENSE-LLAMA-3.1) 散布，使用時要遵守 [Acceptable Use Policy](USE_POLICY-LLAMA-3.1.md)，另見 [NOTICE](NOTICE)。
+
+Llama 3.1 is licensed under the Llama 3.1 Community License, Copyright © Meta Platforms, Inc. All Rights Reserved.
