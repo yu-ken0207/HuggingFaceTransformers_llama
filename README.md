@@ -180,3 +180,7 @@ uvicorn llama_api_service:app --host 0.0.0.0 --port 8000
 
 這套服務結合了 FastAPI 和 LLaMA 模型的優勢，是構建高效推理 API 的理想解決方案，具有靈活性和擴展性。
 
+
+## License
+
+程式碼採 Apache-2.0，見 [LICENSE](LICENSE)。
