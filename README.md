@@ -1,5 +1,7 @@
 # 基於 FastAPI 和 LLaMA 模型的 API 服務
 
+> Serves Meta Llama 3.1 8B Instruct as a FastAPI service for robot task planning: `/generate` for chat-style generation and `/generate_with_function` for tool calling with a JSON schema (for example, breaking "put the book on the side table" into steps). A second service loads two LoRA adapters fine-tuned for task decomposition and sub-task planning; the adapters are included in this repo and were trained with [LlamaLoRAFinetuner](https://github.com/yu-ken0207/LlamaLoRAFinetuner).
+
 **Built with Llama**：兩個 `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重由 Meta Llama 3.1 微調而來，授權見最下方。
 
 此專案展示如何構建基於 FastAPI 的 API 服務，並整合 Meta LLaMA 3.1 模型進行文本生成任務。服務包括：
@@ -39,12 +41,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ### 2. 啟動 API
 啟動 FastAPI 服務：
 
+原版 Llama 3.1（支援工具呼叫）。先把 `llama_api_service_function.py` 裡的 `model_id` 改成模型所在的路徑：
+
 ```bash
 uvicorn llama_api_service_function:app --host 0.0.0.0 --port 8000
 ```
-或
+
+或載入這個 repo 附的兩個 LoRA 權重（任務拆解、子任務規劃，另外需要 `unsloth`）：
+
 ```bash
-uvicorn llama_api_service:app --host 0.0.0.0 --port 8000
+uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
 ```
 
 ## API 端點說明
