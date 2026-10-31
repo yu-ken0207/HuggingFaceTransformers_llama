@@ -29,6 +29,8 @@
 pip install fastapi uvicorn transformers torch bitsandbytes
 ```
 
+> **注意**：`environment.yml` 是 2025 年 1 月實驗時的環境，裡面不少套件（transformers、torch、fastapi 等）已有公開的安全漏洞。這個服務也沒有驗證機制，只建議在自己的電腦或可信任的內網測試，不要直接開到網際網路上；要長期使用，請換成新版套件重新驗證。
+
 ## 設置步驟
 
 ### 1. 環境配置
