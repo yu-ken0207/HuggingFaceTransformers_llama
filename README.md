@@ -1,103 +1,105 @@
-# 基於 FastAPI 和 LLaMA 模型的 API 服務
+# LLaMA API Service with FastAPI
+
+**English** | [繁體中文](README.zh-TW.md)
 
 [![Checks](https://github.com/yu-ken0207/HuggingFaceTransformers_llama/actions/workflows/check.yml/badge.svg)](https://github.com/yu-ken0207/HuggingFaceTransformers_llama/actions/workflows/check.yml)
 
-> Serves Meta Llama 3.1 8B Instruct as a FastAPI service for robot task planning: `/generate` for chat-style generation and `/generate_with_function` for tool calling with a JSON schema (for example, breaking "put the book on the side table" into steps). A second service loads two LoRA adapters fine-tuned for task decomposition and sub-task planning; the adapters are included in this repo and were trained with [LlamaLoRAFinetuner](https://github.com/yu-ken0207/LlamaLoRAFinetuner).
+Serves Meta Llama 3.1 8B Instruct as a FastAPI service for robot task planning: `/generate` for chat-style generation and `/generate_with_function` for tool calling with a JSON schema (for example, breaking "put the book on the side table" into steps). A second service loads two LoRA adapters fine-tuned for task decomposition and sub-task planning; the adapters are included in this repo and were trained with [LlamaLoRAFinetuner](https://github.com/yu-ken0207/LlamaLoRAFinetuner).
 
-**Built with Llama**：兩個 `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重由 Meta Llama 3.1 微調而來，授權見最下方。
+**Built with Llama**: the LoRA weights in the two `Llama-3.1-8B-Instruct-bnb-4bit_*` folders are fine-tuned from Meta Llama 3.1. See the license section at the bottom.
 
-此專案展示如何構建基於 FastAPI 的 API 服務，並整合 Meta LLaMA 3.1 模型進行文本生成任務。服務包括：
+The service has two endpoints:
 
-- 簡單的文本生成端點（`/generate`）。
-- 支援工具的生成端點（`/generate_with_function`），動態處理複雜任務的工具。
+- Simple text generation (`/generate`)
+- Generation with tools (`/generate_with_function`), where tools are defined per request
 
-## 功能特點
+## Features
 
-### 文本生成
-- 使用 `/generate` 端點生成回應。
+### Text generation
+- `/generate` returns a reply to the given messages.
 
-### 動態工具整合
-- 使用 JSON schema 定義工具，完成如分解任務的複雜功能（`/generate_with_function`）。
+### Tools defined per request
+- Define tools with a JSON schema to handle tasks such as breaking a task into steps (`/generate_with_function`).
 
-### 優化大型模型的內存管理
-- 支援 `torch.float16` 精度和 8-bit 量化以提高運行效率。
+### Memory options for large models
+- Supports `torch.float16` and 8-bit quantization to reduce memory use.
 
-## 環境需求
-- Python 3.11+（實測 3.12）
-- 支援 CUDA 的 GPU
-- 先依顯示卡的 CUDA 版本安裝 torch（其他 CUDA 版本的指令見 [PyTorch 官網](https://pytorch.org/get-started/locally/)），再裝其他套件；`environment.yml` 只建立 Python 環境：
+## Requirements
+
+- Python 3.11+ (tested with 3.12)
+- A CUDA-capable GPU
+- Install torch for your GPU's CUDA version first (commands for other versions are on the [PyTorch website](https://pytorch.org/get-started/locally/)), then the other packages. `environment.yml` only creates the Python environment:
 
 ```bash
 pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu130   # CUDA 13.0
 pip install -r requirements.txt
 ```
 
-`requirements.txt` 是 2026 年 11 月實測過的版本（transformers 5.17.0、unsloth 2026.10.11 等），在 Linux ARM64、NVIDIA Blackwell 顯示卡、CUDA 13.0 上實測過兩個服務的 `/generate` 與 `/generate_with_function`（原版模型服務以 Llama 3.2 1B Instruct 代替 8B 測試，float32 與 8-bit 量化都跑過）。x86 電腦照同樣步驟、把 torch 換成自己 CUDA 版本的安裝指令即可，但沒有實測。
+`requirements.txt` lists versions tested in November 2026 (transformers 5.17.0, unsloth 2026.10.11, and others). Both services' `/generate` and `/generate_with_function` were tested on Linux ARM64 with an NVIDIA Blackwell GPU and CUDA 13.0 (the base-model service was tested with Llama 3.2 1B Instruct instead of 8B, in both float32 and 8-bit). On x86, follow the same steps with the torch install command for your CUDA version; this was not tested on real hardware, but GitHub Actions checks that the dependency versions resolve on x86 with Python 3.11 and 3.12.
 
-> **注意**：unsloth 目前只支援 datasets 5.0 以前的版本，跟著裝進來的 datasets 4.8.5 與 fsspec 各有一個已知漏洞，分別出在「資料夾型資料集」與「Kerchunk 參考檔」，這個服務沒有用到。這個服務也沒有驗證機制，只建議在自己的電腦或可信任的內網測試，不要直接開到網際網路上。
+> **Note**: unsloth currently supports only datasets versions before 5.0. The datasets 4.8.5 and fsspec versions it brings in each have one known vulnerability (in folder-based dataset builders and in Kerchunk reference files), which this service doesn't use. The service also has no authentication: run it only on your own computer or a trusted network, never directly on the internet.
 
-## 設置步驟
+## Setup
 
-### 1. 環境配置
-為避免內存碎片化並優化 GPU 使用，設置環境變量：
+### 1. Environment
+To avoid memory fragmentation and make better use of the GPU, set:
 
 ```bash
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```
 
-### 2. 啟動 API
-啟動 FastAPI 服務：
+### 2. Start the API
 
-原版 Llama 3.1（支援工具呼叫）。先把 `llama_api_service_function.py` 裡的 `model_id` 改成模型所在的路徑：
+Base Llama 3.1 (with tool calling). First set `model_id` in `llama_api_service_function.py` to the path of the model:
 
 ```bash
 uvicorn llama_api_service_function:app --host 0.0.0.0 --port 8000
 ```
 
-或載入這個 repo 附的兩個 LoRA 權重（任務拆解、子任務規劃，另外需要 `unsloth`）：
+Or load the two LoRA adapters included in this repo (task decomposition and sub-task planning; needs `unsloth`):
 
 ```bash
 uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
 ```
 
-## API 端點說明
+## API endpoints
 
 ### 1. `/generate`
-- **說明**：根據用戶提供的訊息生成回應。
-- **請求範例**：
+- **Description**: generates a reply to the user's messages.
+- **Request example**:
 
   ```json
   {
     "messages": [
-      {"role": "system", "content": "角色：專業的任務規劃機器人"},
-      {"role": "user", "content": "將刀子和杯子移動到櫃檯。"}
+      {"role": "system", "content": "Role: Professional Task Planning Robot"},
+      {"role": "user", "content": "Move a knife and cup to a counter."}
     ],
     "max_new_tokens": 256
   }
   ```
-- **回應範例**：
+- **Response example**:
 
   ```json
   {
     "role": "assistant",
-    "content": "1. 找到刀子。2. 拿起刀子。3. 找到杯子。4. 拿起杯子。5. 走到櫃檯。6. 將刀子和杯子放在櫃檯上。"
+    "content": "1. Find the knife. 2. Pick up the knife. 3. Find the cup. 4. Pick up the cup. 5. Walk to the counter. 6. Place the knife and cup on the counter."
   }
   ```
 
 ### 2. `/generate_with_function`
-- **說明**：允許用戶定義工具以完成更複雜的生成任務。
-- **請求範例**：
+- **Description**: lets the caller define tools for more complex generation tasks.
+- **Request example**:
 
   ```json
   {
     "messages": [
-      {"role": "system", "content": "接收一個任務，將其分解成多個步驟。"},
-      {"role": "user", "content": "將書本放在側桌上。"}
+      {"role": "system", "content": "You will receive a task. Decompose it into multiple steps."},
+      {"role": "user", "content": "Put the book on the side table."}
     ],
     "tools": [
       {
         "name": "decompose_task",
-        "description": "將任務分解為子任務，並返回包含子任務列表的 JSON 對象。",
+        "description": "Decompose the task into subtasks and return a JSON object containing the list of subtasks.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -106,8 +108,8 @@ uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
               "items": {
                 "type": "object",
                 "properties": {
-                  "task": {"type": "string", "description": "子任務的名稱。"},
-                  "description": {"type": "string", "description": "子任務的描述。"}
+                  "task": {"type": "string", "description": "The name of the subtask."},
+                  "description": {"type": "string", "description": "What the subtask does."}
                 },
                 "required": ["task", "description"]
               }
@@ -120,85 +122,82 @@ uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
     "max_new_tokens": 256
   }
   ```
-- **回應範例**：
+- **Response example**:
 
   ```json
   {
     "role": "assistant",
-    "content": "{\"tasks\": [{\"task\": \"找到書本\", \"description\": \"定位書本的位置。\"}, {\"task\": \"拿起書本\", \"description\": \"將書本提起來。\"}, {\"task\": \"走到側桌\", \"description\": \"接近側桌。\"}, {\"task\": \"將書本放在側桌上\", \"description\": \"輕輕地將書本放在側桌上。\"}]}
+    "content": "{\"tasks\": [{\"task\": \"Find the book\", \"description\": \"Locate the book.\"}, {\"task\": \"Pick up the book\", \"description\": \"Lift the book.\"}, {\"task\": \"Walk to the side table\", \"description\": \"Approach the side table.\"}, {\"task\": \"Put the book on the side table\", \"description\": \"Gently place the book on the side table.\"}]}"
   }
   ```
 
-## 內存優化機制
+## Memory options
 
 ### `dtype=torch.float16`
-- **作用**：使用 16-bit 浮點數（FP16）進行計算和存儲，降低內存需求。
-- **優勢**：適用於現代 GPU（如 NVIDIA Ampere 架構），能加速推理過程。
+- **What it does**: computes and stores values in 16-bit floating point (FP16), halving memory compared with float32.
+- **Benefit**: well suited to modern GPUs (such as NVIDIA Ampere) and speeds up inference.
 
 ### `quantization_config=BitsAndBytesConfig(load_in_8bit=True)`
-- **作用**：將模型權重量化為 8-bit 數據，顯著降低內存占用。
-- **優勢**：可在顯存受限的 GPU 上運行大模型（如 13B、30B）。
+- **What it does**: quantizes the model weights to 8 bits, cutting memory use substantially.
+- **Benefit**: lets larger models (such as 13B or 30B) run on GPUs with limited memory.
 
-### 結合使用的原因
-- **權重和激活值的最佳優化**：`torch.float16` 用於激活值存儲和計算，8-bit 量化用於模型權重存儲。
-- **平衡內存和性能**：同時啟用能在內存節省與計算效率間取得最佳平衡。
+### Why combine them
+- **Weights and activations**: FP16 is used for activations, and 8-bit quantization for weight storage.
+- **Memory and speed**: using both balances memory savings and compute efficiency.
 
-## 程式邏輯
+## How it works
 
-1. **模型初始化**：
-   - 使用 FP16 和 8-bit 量化啟動模型，並優化內存配置。
+1. **Model loading**:
+   - The base-model service loads in float32 by default; turn on 8-bit quantization if GPU memory is short (see "Out of GPU memory"). The LoRA service loads its two models in FP16 with 4-bit quantization.
 
-2. **API 端點**：
-   - `/generate`：處理基本文本生成任務。
-   - `/generate_with_function`：處理需要工具支持的任務。
+2. **API endpoints**:
+   - `/generate`: basic text generation
+   - `/generate_with_function`: generation that uses tools
 
-3. **動態工具支持**：
-   - 用戶可通過 JSON schema 定義工具，用於特定的生成需求。
+3. **Tools per request**:
+   - Callers define tools with a JSON schema for each request.
 
-4. **回應解析**：
-   - 解析生成的工具調用，並根據工具執行相應的邏輯。
+4. **Response parsing**:
+   - The service checks the output for a tool call and reports it in `tool_call`.
 
-## 自訂與擴展
+## Customize and extend
 
-### 新增工具
-- 按照工具模式（ToolSchema）定義新工具。
-- 更新端點邏輯以支持更多的工具功能。
+### Add tools
+- Define new tools following the tool schema (`ToolSchema`).
+- Extend the endpoint logic to support more tools.
 
-### 調整生成參數
-- 修改 `temperature`、`top_p` 等參數以控制生成風格。
+### Generation parameters
+- Adjust `temperature`, `top_p`, and so on to change the style of the output.
 
-### 更換模型
-- 更新 `model_id` 以支持不同的 LLaMA 模型或其他 Hugging Face 模型。
+### Change the model
+- Update `model_id` to use a different LLaMA model or another Hugging Face model.
 
-## 常見問題與解決方案
+## Troubleshooting
 
-### 顯存不足
-- **檢查是否有其他進程佔用 GPU**：
+### Out of GPU memory
+- **Check for other processes on the GPU**:
   ```bash
   nvidia-smi
   ```
-- **終止不必要的進程**：
+- **Stop processes you don't need**:
   ```bash
   kill -9 <PID>
   ```
-- **減少 `max_new_tokens` 的值**，例如從 256 減少到 128。
-- **啟用 8-bit 量化**：把 `llama_api_service_function.py` 裡這一行的註解拿掉：
+- **Lower `max_new_tokens`**, for example from 256 to 128.
+- **Turn on 8-bit quantization**: uncomment this line in `llama_api_service_function.py`:
   ```python
   quantization_config=transformers.BitsAndBytesConfig(load_in_8bit=True),
   ```
-- **選擇較小的模型**（如 7B 而非 13B 或 30B）。
+- **Use a smaller model** (for example 7B instead of 13B or 30B).
 
-## 未來規劃
-- 增加更多工具支持。
-- 實現領域專用的模型微調。
-- 優化多 GPU 或分佈式部署場景。
-
-這套服務結合了 FastAPI 和 LLaMA 模型的優勢，是構建高效推理 API 的理想解決方案，具有靈活性和擴展性。
-
+## Future work
+- More tools.
+- Domain-specific fine-tuning.
+- Multi-GPU and distributed deployment.
 
 ## License
 
-- 程式碼：Apache-2.0，見 [LICENSE](LICENSE)。
-- `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重與 tokenizer：由 Meta Llama 3.1 衍生，依 [Llama 3.1 Community License](LICENSE-LLAMA-3.1) 散布，使用時要遵守 [Acceptable Use Policy](USE_POLICY-LLAMA-3.1.md)，另見 [NOTICE](NOTICE)。
+- Code: Apache-2.0, see [LICENSE](LICENSE).
+- LoRA weights and tokenizers in the `Llama-3.1-8B-Instruct-bnb-4bit_*` folders: derived from Meta Llama 3.1 and distributed under the [Llama 3.1 Community License](LICENSE-LLAMA-3.1). Use must follow the [Acceptable Use Policy](USE_POLICY-LLAMA-3.1.md); see also [NOTICE](NOTICE).
 
 Llama 3.1 is licensed under the Llama 3.1 Community License, Copyright © Meta Platforms, Inc. All Rights Reserved.
