@@ -21,15 +21,18 @@
 - 支援 `torch.float16` 精度和 8-bit 量化以提高運行效率。
 
 ## 環境需求
-- Python 3.8+
+- Python 3.11+（實測 3.12）
 - 支援 CUDA 的 GPU
-- 所需庫：
+- 先依顯示卡的 CUDA 版本安裝 torch（其他 CUDA 版本的指令見 [PyTorch 官網](https://pytorch.org/get-started/locally/)），再裝其他套件；`environment.yml` 只建立 Python 環境：
 
 ```bash
-pip install fastapi uvicorn transformers torch bitsandbytes
+pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu130   # CUDA 13.0
+pip install -r requirements.txt
 ```
 
-> **注意**：`environment.yml` 是 2025 年 1 月實驗時的環境，裡面不少套件（transformers、torch、fastapi 等）已有公開的安全漏洞。這個服務也沒有驗證機制，只建議在自己的電腦或可信任的內網測試，不要直接開到網際網路上；要長期使用，請換成新版套件重新驗證。
+`requirements.txt` 是 2026 年 11 月實測過的版本（transformers 5.17.0、unsloth 2026.10.11 等），在 Linux ARM64、NVIDIA Blackwell 顯示卡、CUDA 13.0 上實測過兩個服務的 `/generate` 與 `/generate_with_function`（原版模型服務以 Llama 3.2 1B Instruct 代替 8B 測試，float32 與 8-bit 量化都跑過）。x86 電腦照同樣步驟、把 torch 換成自己 CUDA 版本的安裝指令即可，但沒有實測。
+
+> **注意**：unsloth 目前只支援 datasets 5.0 以前的版本，跟著裝進來的 datasets 4.8.5 與 fsspec 各有一個已知漏洞，分別出在「資料夾型資料集」與「Kerchunk 參考檔」，這個服務沒有用到。這個服務也沒有驗證機制，只建議在自己的電腦或可信任的內網測試，不要直接開到網際網路上。
 
 ## 設置步驟
 
@@ -126,16 +129,16 @@ uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
 
 ## 內存優化機制
 
-### `torch_dtype=torch.float16`
+### `dtype=torch.float16`
 - **作用**：使用 16-bit 浮點數（FP16）進行計算和存儲，降低內存需求。
 - **優勢**：適用於現代 GPU（如 NVIDIA Ampere 架構），能加速推理過程。
 
-### `load_in_8bit=True`
+### `quantization_config=BitsAndBytesConfig(load_in_8bit=True)`
 - **作用**：將模型權重量化為 8-bit 數據，顯著降低內存占用。
 - **優勢**：可在顯存受限的 GPU 上運行大模型（如 13B、30B）。
 
 ### 結合使用的原因
-- **權重和激活值的最佳優化**：`torch.float16` 用於激活值存儲和計算，`load_in_8bit=True` 用於模型權重存儲。
+- **權重和激活值的最佳優化**：`torch.float16` 用於激活值存儲和計算，8-bit 量化用於模型權重存儲。
 - **平衡內存和性能**：同時啟用能在內存節省與計算效率間取得最佳平衡。
 
 ## 程式邏輯
@@ -177,9 +180,9 @@ uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
   kill -9 <PID>
   ```
 - **減少 `max_new_tokens` 的值**，例如從 256 減少到 128。
-- **禁用 8-bit 量化**：
+- **啟用 8-bit 量化**：把 `llama_api_service_function.py` 裡這一行的註解拿掉：
   ```python
-  load_in_8bit=False
+  quantization_config=transformers.BitsAndBytesConfig(load_in_8bit=True),
   ```
 - **選擇較小的模型**（如 7B 而非 13B 或 30B）。
 

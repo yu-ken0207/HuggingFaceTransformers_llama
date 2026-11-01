@@ -1,0 +1,15 @@
+# 2026 年 11 月實測過的版本（Python 3.12、CUDA 13.0）
+# torch 要先依顯示卡的 CUDA 版本另外安裝，見 README
+torch==2.14.1
+# torch 的安裝來源會帶舊版 setuptools，有已知漏洞
+setuptools>=84.1.0
+transformers==5.17.0
+accelerate==1.15.0
+bitsandbytes==0.50.2
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.2
+requests==2.34.2
+# 載入這個 repo 附的 LoRA 權重（llama_api_service_fintune.py）才需要
+unsloth==2026.10.11
+unsloth_zoo==2026.10.11
