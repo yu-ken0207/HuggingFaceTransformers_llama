@@ -1,5 +1,7 @@
 # 基於 FastAPI 和 LLaMA 模型的 API 服務
 
+[![Checks](https://github.com/yu-ken0207/HuggingFaceTransformers_llama/actions/workflows/check.yml/badge.svg)](https://github.com/yu-ken0207/HuggingFaceTransformers_llama/actions/workflows/check.yml)
+
 > Serves Meta Llama 3.1 8B Instruct as a FastAPI service for robot task planning: `/generate` for chat-style generation and `/generate_with_function` for tool calling with a JSON schema (for example, breaking "put the book on the side table" into steps). A second service loads two LoRA adapters fine-tuned for task decomposition and sub-task planning; the adapters are included in this repo and were trained with [LlamaLoRAFinetuner](https://github.com/yu-ken0207/LlamaLoRAFinetuner).
 
 **Built with Llama**：兩個 `Llama-3.1-8B-Instruct-bnb-4bit_*` 資料夾裡的 LoRA 權重由 Meta Llama 3.1 微調而來，授權見最下方。
