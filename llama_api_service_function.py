@@ -18,12 +18,12 @@ model_id = "/path/to/Meta-Llama-3.1-8B-Instruct"
 tokenizer = transformers.AutoTokenizer.from_pretrained(model_id)
 model = transformers.AutoModelForCausalLM.from_pretrained(
     model_id,
-    torch_dtype=torch.float32, # float32
-    load_in_8bit=False,  # 啟用 8-bit 量化 可以註解 將模型權重從浮點數壓縮到 8-bit  8-bit 量化只影響模型的權重存儲，而激活值仍然使用 FP16 或 FP32 進行計算
+    dtype=torch.float32, # float32
+    # quantization_config=transformers.BitsAndBytesConfig(load_in_8bit=True),  # 啟用 8-bit 量化 將模型權重從浮點數壓縮到 8-bit  8-bit 量化只影響模型的權重存儲，而激活值仍然使用 FP16 或 FP32 進行計算
     device_map="balanced"
 )
 """
-torch_dtype=torch.float16 的作用
+dtype=torch.float16 的作用
 降低計算精度的內存需求：
 
 使用 16-bit 浮點數（FP16）將模型的計算和存儲壓縮至 float32 的一半。
@@ -34,7 +34,7 @@ FP16 是現代 GPU（如 NVIDIA Ampere 架構）專門優化的一種數據格�
 FP16 不會影響激活值存儲的壓縮效果，即使模型本身量化為 8-bit。
 """
 """
-load_in_8bit=True 的作用
+BitsAndBytesConfig(load_in_8bit=True) 的作用
 進一步壓縮模型權重：
 
 使用 8-bit 量化技術將模型權重從浮點數壓縮為 8-bit 數據。
@@ -46,8 +46,8 @@ load_in_8bit=True 的作用
 """
 不同部分的優化：
 
-load_in_8bit=True 僅影響 模型權重的存儲，不影響激活值的存儲方式。
-torch_dtype=torch.float16 用於 激活值的計算和存儲，與權重量化互補。
+8-bit 量化僅影響 模型權重的存儲，不影響激活值的存儲方式。
+dtype=torch.float16 用於 激活值的計算和存儲，與權重量化互補。
 同時啟用可以使權重和激活值的內存需求都達到最優化。
 平衡內存節省和精度：
 
@@ -207,7 +207,7 @@ async def generate_text_func(request: GenerateWithFunctionRequest):
     max_new_tokens = request.max_new_tokens
 
     # 將工具轉換為符合 apply_chat_template 要求的格式
-    tools_json = [tool.dict() for tool in tools]
+    tools_json = [tool.model_dump() for tool in tools]
 
     # 構建輸入
     inputs = tokenizer.apply_chat_template(

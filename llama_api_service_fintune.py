@@ -183,7 +183,7 @@ async def generate_text_func(request: GenerateWithFunctionRequest):
     max_new_tokens = request.max_new_tokens
 
     # 將工具轉換為符合 apply_chat_template 要求的格式
-    tools_json = [tool.dict() for tool in tools]
+    tools_json = [tool.model_dump() for tool in tools]
 
     # 構建輸入
     inputs = tokenizer_SubTaskPlanner.apply_chat_template(

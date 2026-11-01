@@ -6,7 +6,7 @@ model_id = "/path/to/Meta-Llama-3.1-8B-Instruct"
 pipeline = transformers.pipeline(
     "text-generation",
     model=model_id,
-    model_kwargs={"torch_dtype": torch.float16},#float16 float32
+    model_kwargs={"dtype": torch.float16},#float16 float32
     device_map="auto", # auto balanced
     # max_memory={0: "10GiB"},  # 為每張 GPU 分配內存
 )
