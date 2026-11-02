@@ -141,10 +141,6 @@ uvicorn llama_api_service_fintune:app --host 0.0.0.0 --port 8000
 - **What it does**: quantizes the model weights to 8 bits, cutting memory use substantially.
 - **Benefit**: lets larger models (such as 13B or 30B) run on GPUs with limited memory.
 
-### Why combine them
-- **Weights and activations**: FP16 is used for activations, and 8-bit quantization for weight storage.
-- **Memory and speed**: using both balances memory savings and compute efficiency.
-
 ## How it works
 
 1. **Model loading**:
